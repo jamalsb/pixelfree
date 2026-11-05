@@ -7,164 +7,506 @@
 <meta name="description" content="Remove image background free, right in your browser. Your images never leave your device.">
 <style>
   * { box-sizing: border-box; }
-  body { margin: 0; font-family: system-ui, sans-serif; background: #f4f6fb; color: #1f2937; }
+  [hidden] { display: none !important; }
+
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: #f4f6fb;
+    color: #1f2937;
+  }
   header { text-align: center; padding: 24px 16px 8px; }
   h1 { margin: 0; font-size: 1.6rem; }
   .sub { margin: 6px 0 0; color: #6b7280; }
+
   main { max-width: 900px; margin: 0 auto; padding: 16px; }
-  .card { background: #fff; border-radius: 16px; padding: 20px; box-shadow: 0 4px 18px rgba(0,0,0,.06); }
-  .drop { display: block; border: 2px dashed #93c5fd; border-radius: 14px; padding: 32px 16px; text-align: center; cursor: pointer; }
-  .drop.over { background: #eff6ff; }
-  #file { display: none; }
-  .btn { background: #2563eb; color: #fff; border: 0; padding: 12px 20px; border-radius: 10px; font-size: 1rem; cursor: pointer; }
-  .btn:disabled { background: #9ca3af; cursor: not-allowed; }
-  .btn.secondary { background: #10b981; }
-  .row { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-top: 16px; }
-  .previews { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
-  @media (max-width: 600px) { .previews { grid-template-columns: 1fr; } }
-  .box { background: repeating-conic-gradient(#e5e7eb 0% 25%, #fff 0% 50%) 50% / 20px 20px; border-radius: 12px; min-height: 180px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
-  .box img { max-width: 100%; max-height: 420px; display: block; }
-  #status { text-align: center; margin-top: 14px; color: #4b5563; min-height: 1.2em; }
-  .progress { height: 8px; background: #e5e7eb; border-radius: 99px; overflow: hidden; margin-top: 8px; display: none; }
-  .progress > div { height: 100%; width: 0; background: #2563eb; transition: width .2s; }
-  footer { text-align: center; color: #9ca3af; font-size: .85rem; padding: 24px; }
-  footer a { color: inherit; }
+  .card {
+    background: #fff;
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, .06);
+  }
+
+  .drop {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 48px 20px;
+    border: 2px dashed #93c5fd;
+    border-radius: 14px;
+    background: #f8faff;
+    cursor: pointer;
+    text-align: center;
+    transition: background .15s, border-color .15s;
+  }
+  .drop:hover, .drop.drag {
+    border-color: #3b82f6;
+    background: #eff6ff;
+  }
+  .drop svg { color: #60a5fa; }
+  .drop strong { font-size: 1.05rem; }
+  .drop span { color: #6b7280; font-size: .875rem; }
+
+  .hint {
+    margin: 12px 0 0;
+    font-size: .8125rem;
+    color: #6b7280;
+    text-align: center;
+    min-height: 1em;
+  }
+  .hint.error { color: #b91c1c; }
+
+  .editor { margin-top: 4px; }
+
+  .canvas-wrap {
+    position: relative;
+    display: grid;
+    place-items: center;
+    padding: 8px;
+    border-radius: 12px;
+    background-color: #fff;
+    background-image:
+      linear-gradient(45deg, #e5e7eb 25%, transparent 25%),
+      linear-gradient(-45deg, #e5e7eb 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #e5e7eb 75%),
+      linear-gradient(-45deg, transparent 75%, #e5e7eb 75%);
+    background-size: 20px 20px;
+    background-position: 0 0, 0 10px, 10px -10px, -10px 0;
+    box-shadow: inset 0 0 0 1px #e5e7eb;
+  }
+  canvas {
+    display: block;
+    max-width: 100%;
+    max-height: 58vh;
+    border-radius: 6px;
+  }
+
+  .badge {
+    position: absolute;
+    top: 14px;
+    left: 14px;
+    padding: 4px 10px;
+    font-size: .75rem;
+    font-weight: 600;
+    color: #1e3a8a;
+    background: rgba(255, 255, 255, .85);
+    border-radius: 999px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, .12);
+  }
+
+  .controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px 24px;
+    margin-top: 18px;
+  }
+  .control { display: block; font-size: .875rem; color: #374151; }
+  .control b { color: #1d4ed8; font-variant-numeric: tabular-nums; }
+  .control input[type="range"] {
+    width: 100%;
+    margin-top: 8px;
+    accent-color: #2563eb;
+  }
+
+  .row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 20px;
+  }
+  .check {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: .875rem;
+    color: #374151;
+    cursor: pointer;
+    user-select: none;
+  }
+  .check input { accent-color: #2563eb; }
+
+  .actions { display: flex; gap: 10px; flex-wrap: wrap; }
+  .btn {
+    font: inherit;
+    font-size: .9rem;
+    padding: 10px 18px;
+    border-radius: 10px;
+    border: 1px solid #d1d5db;
+    background: #fff;
+    color: #1f2937;
+    cursor: pointer;
+    transition: background .15s, border-color .15s, transform .05s;
+  }
+  .btn:hover { background: #f3f4f6; }
+  .btn:active { transform: translateY(1px); }
+  .btn.primary {
+    background: #2563eb;
+    border-color: #2563eb;
+    color: #fff;
+    font-weight: 600;
+  }
+  .btn.primary:hover { background: #1d4ed8; }
+  .btn:disabled { opacity: .55; cursor: not-allowed; }
+
+  @media (max-width: 560px) {
+    .controls { grid-template-columns: 1fr; }
+    .btn { flex: 1 1 auto; }
+  }
 </style>
 </head>
 <body>
+
 <header>
-  <h1>🖼️ Free Background Remover</h1>
-  <p class="sub">Choose a picture and the background is removed automatically. Your image never leaves your device.</p>
+  <h1>Free Background Remover</h1>
+  <p class="sub">Remove an image background right in your browser — your images never leave your device.</p>
 </header>
 
 <main>
   <div class="card">
-    <label class="drop" id="drop">
-      <div>📁 Drop an image here or click to choose one</div>
-      <input type="file" id="file" accept="image/*">
+
+    <label class="drop" id="drop" for="fileInput">
+      <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="17 8 12 3 7 8"/>
+        <line x1="12" y1="3" x2="12" y2="15"/>
+      </svg>
+      <strong>Drop an image here</strong>
+      <span>or click to choose a file · PNG, JPG, WebP · you can also paste with Ctrl&nbsp;+&nbsp;V</span>
+      <input type="file" id="fileInput" accept="image/*" hidden>
     </label>
 
-    <div class="progress" id="progress"><div id="bar"></div></div>
-    <div id="status"></div>
+    <p class="hint" id="hint"></p>
 
-    <div class="previews">
-      <div><div class="box"><img id="orig" alt=""></div></div>
-      <div><div class="box"><img id="result" alt=""></div></div>
-    </div>
+    <section class="editor" id="editor" hidden>
+      <div class="canvas-wrap">
+        <canvas id="outCanvas"></canvas>
+        <span class="badge" id="badge">Result</span>
+      </div>
 
-    <div class="row">
-      <button class="btn" id="removeBtn" disabled>Remove Background</button>
-      <button class="btn secondary" id="downloadBtn" disabled>Download (PNG)</button>
-    </div>
+      <div class="controls">
+        <label class="control">
+          <span>Background tolerance <b id="tolVal">25</b></span>
+          <input type="range" id="tol" min="1" max="100" step="1" value="25">
+        </label>
+        <label class="control">
+          <span>Edge softness <b id="softVal">1</b></span>
+          <input type="range" id="soft" min="0" max="3" step="1" value="1">
+        </label>
+      </div>
+
+      <div class="row">
+        <label class="check">
+          <input type="checkbox" id="compare">
+          Show original
+        </label>
+        <div class="actions">
+          <button id="download" class="btn primary" type="button">Download PNG</button>
+          <button id="reset" class="btn" type="button">Choose another image</button>
+        </div>
+      </div>
+    </section>
+
   </div>
 </main>
 
-<footer>
-  © <span id="year"></span> · <a href="#">Privacy Policy</a> · <a href="#">Contact</a>
-</footer>
+<script>
+(() => {
+  "use strict";
 
-<script type="module">
-import { removeBackground } from 'https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.5.5/dist/index.mjs';
+  const MAX_DIM = 2400;
 
-const $ = id => document.getElementById(id);
-let currentFile = null;
-let origUrl = null;
-let resultBlob = null;
-let busy = false;
+  const $ = (id) => document.getElementById(id);
+  const drop      = $("drop");
+  const fileInput = $("fileInput");
+  const hint      = $("hint");
+  const editor    = $("editor");
+  const canvas    = $("outCanvas");
+  const badge     = $("badge");
+  const ctx       = canvas.getContext("2d", { willReadFrequently: true });
+  const tolInput  = $("tol");
+  const tolVal    = $("tolVal");
+  const softInput = $("soft");
+  const softVal   = $("softVal");
+  const compare   = $("compare");
+  const dlBtn     = $("download");
+  const resetBtn  = $("reset");
 
-const MAX_SIDE = 1200; // large photos can freeze phones, so shrink first
+  let sourceImageData = null;
+  let processedImageData = null;
+  let fileName = "image";
 
-$('year').textContent = new Date().getFullYear();
+  const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 
-function setStatus(text) { $('status').textContent = text; }
-function setProgress(percent) {
-  $('progress').style.display = percent == null ? 'none' : 'block';
-  if (percent != null) $('bar').style.width = percent + '%';
-}
-
-// Shrink the image to MAX_SIDE and return a PNG blob
-function shrinkImage(file) {
-  return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = () => {
-      const scale = Math.min(1, MAX_SIDE / Math.max(img.width, img.height));
-      const canvas = document.createElement('canvas');
-      canvas.width = Math.round(img.width * scale);
-      canvas.height = Math.round(img.height * scale);
-      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-      URL.revokeObjectURL(url);
-      canvas.toBlob(b => b ? resolve(b) : reject(new Error('Could not read this image.')), 'image/png');
-    };
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Could not open this image.')); };
-    img.src = url;
-  });
-}
-
-function loadFile(file) {
-  if (!file || !file.type.startsWith('image/')) {
-    setStatus('Please choose an image file only.');
-    return;
+  function setHint(msg, isError = false) {
+    hint.textContent = msg || "";
+    hint.classList.toggle("error", !!isError);
   }
-  currentFile = file;
-  if (origUrl) URL.revokeObjectURL(origUrl);
-  origUrl = URL.createObjectURL(file);
-  $('orig').src = origUrl;
-  $('result').removeAttribute('src');
-  resultBlob = null;
-  $('removeBtn').disabled = false;
-  $('downloadBtn').disabled = true;
-  setStatus('Now press "Remove Background".');
-}
 
-// File input and drag-and-drop
-const drop = $('drop');
-$('file').addEventListener('change', e => loadFile(e.target.files[0]));
-['dragenter', 'dragover'].forEach(ev =>
-  drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
-['dragleave', 'drop'].forEach(ev =>
-  drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
-drop.addEventListener('drop', e => loadFile(e.dataTransfer.files[0]));
-
-// Remove background
-$('removeBtn').addEventListener('click', async () => {
-  if (!currentFile || busy) return;
-  busy = true;
-  $('removeBtn').disabled = true;
-  try {
-    setStatus('Preparing image...');
-    setProgress(0);
-    const small = await shrinkImage(currentFile);
-
-    setStatus('Removing background (first time downloads the AI model, please wait)...');
-    const blob = await removeBackground(small, {
-      progress: (key, current, total) => {
-        if (total) setProgress(Math.round(current / total * 100));
-      }
+  function loadImage(file) {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("decode failed")); };
+      img.src = url;
     });
-
-    resultBlob = blob;
-    $('result').src = URL.createObjectURL(blob);
-    $('downloadBtn').disabled = false;
-    setStatus('Done ✅');
-  } catch (err) {
-    console.error(err);
-    setStatus('Something went wrong: ' + (err && err.message ? err.message : err));
-  } finally {
-    setProgress(null);
-    busy = false;
-    $('removeBtn').disabled = false;
   }
-});
 
-// Download as PNG (transparent background)
-$('downloadBtn').addEventListener('click', () => {
-  if (!resultBlob) return;
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(resultBlob);
-  a.download = 'no-background.png';
-  a.click();
-});
+  async function handleFile(file) {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setHint("That file doesn't look like an image.", true);
+      return;
+    }
+
+    setHint("Loading…");
+    let img;
+    try {
+      img = await loadImage(file);
+    } catch {
+      setHint("Sorry, that image could not be read.", true);
+      return;
+    }
+
+    fileName = (file.name || "image").replace(/\.[^.]+$/, "") || "image";
+
+    const scale = Math.min(1, MAX_DIM / Math.max(img.naturalWidth, img.naturalHeight));
+    const w = Math.max(1, Math.round(img.naturalWidth * scale));
+    const h = Math.max(1, Math.round(img.naturalHeight * scale));
+
+    canvas.width = w;
+    canvas.height = h;
+    ctx.clearRect(0, 0, w, h);
+    ctx.drawImage(img, 0, 0, w, h);
+
+    sourceImageData = ctx.getImageData(0, 0, w, h);
+    processedImageData = null;
+
+    compare.checked = false;
+    drop.hidden = true;
+    editor.hidden = false;
+    dlBtn.disabled = false;
+
+    setHint(
+      scale < 1
+        ? `Image scaled to ${w}×${h}px for processing (max ${MAX_DIM}px).`
+        : `${w}×${h}px · processing happens locally.`
+    );
+
+    process();
+  }
+
+  function floodMask(data, w, h, tol) {
+    const n = w * h;
+    const mask = new Uint8Array(n);
+    const stack = new Int32Array(n);
+    const tol2 = tol * tol;
+    let sp = 0;
+
+    for (let x = 0; x < w; x++) {
+      mask[x] = 1; stack[sp++] = x;
+      const b = (h - 1) * w + x;
+      if (!mask[b]) { mask[b] = 1; stack[sp++] = b; }
+    }
+    for (let y = 0; y < h; y++) {
+      const l = y * w;
+      if (!mask[l]) { mask[l] = 1; stack[sp++] = l; }
+      const r = l + w - 1;
+      if (!mask[r]) { mask[r] = 1; stack[sp++] = r; }
+    }
+
+    while (sp > 0) {
+      const i = stack[--sp];
+      const p = i << 2;
+      const r0 = data[p], g0 = data[p + 1], b0 = data[p + 2];
+      const x = i % w;
+      const y = (i / w) | 0;
+
+      if (x > 0) {
+        const j = i - 1;
+        if (!mask[j]) {
+          const q = j << 2;
+          const dr = data[q] - r0, dg = data[q + 1] - g0, db = data[q + 2] - b0;
+          if (dr * dr + dg * dg + db * db <= tol2) { mask[j] = 1; stack[sp++] = j; }
+        }
+      }
+      if (x < w - 1) {
+        const j = i + 1;
+        if (!mask[j]) {
+          const q = j << 2;
+          const dr = data[q] - r0, dg = data[q + 1] - g0, db = data[q + 2] - b0;
+          if (dr * dr + dg * dg + db * db <= tol2) { mask[j] = 1; stack[sp++] = j; }
+        }
+      }
+      if (y > 0) {
+        const j = i - w;
+        if (!mask[j]) {
+          const q = j << 2;
+          const dr = data[q] - r0, dg = data[q + 1] - g0, db = data[q + 2] - b0;
+          if (dr * dr + dg * dg + db * db <= tol2) { mask[j] = 1; stack[sp++] = j; }
+        }
+      }
+      if (y < h - 1) {
+        const j = i + w;
+        if (!mask[j]) {
+          const q = j << 2;
+          const dr = data[q] - r0, dg = data[q + 1] - g0, db = data[q + 2] - b0;
+          if (dr * dr + dg * dg + db * db <= tol2) { mask[j] = 1; stack[sp++] = j; }
+        }
+      }
+    }
+
+    return mask;
+  }
+
+  function boxBlur(src, w, h, r) {
+    const div = 2 * r + 1;
+    const tmp = new Float32Array(w * h);
+    const out = new Float32Array(w * h);
+
+    for (let y = 0; y < h; y++) {
+      const row = y * w;
+      let sum = 0;
+      for (let k = -r; k <= r; k++) sum += src[row + clamp(k, 0, w - 1)];
+      for (let x = 0; x < w; x++) {
+        tmp[row + x] = sum / div;
+        sum += src[row + clamp(x + r + 1, 0, w - 1)] - src[row + clamp(x - r, 0, w - 1)];
+      }
+    }
+
+    for (let x = 0; x < w; x++) {
+      let sum = 0;
+      for (let k = -r; k <= r; k++) sum += tmp[clamp(k, 0, h - 1) * w + x];
+      for (let y = 0; y < h; y++) {
+        out[y * w + x] = sum / div;
+        sum += tmp[clamp(y + r + 1, 0, h - 1) * w + x] - tmp[clamp(y - r, 0, h - 1) * w + x];
+      }
+    }
+
+    return out;
+  }
+
+  function process() {
+    if (!sourceImageData) return;
+
+    const w = sourceImageData.width;
+    const h = sourceImageData.height;
+    const tol  = Number(tolInput.value) * 1.6;
+    const soft = Number(softInput.value);
+
+    const mask = floodMask(sourceImageData.data, w, h, tol);
+
+    let alpha = new Float32Array(w * h);
+    for (let i = 0; i < alpha.length; i++) alpha[i] = mask[i] ? 0 : 255;
+
+    if (soft > 0) {
+      alpha = boxBlur(alpha, w, h, soft);
+      for (let i = 0; i < alpha.length; i++) {
+        const t = alpha[i] / 255;
+        alpha[i] = t * t * (3 - 2 * t) * 255;
+      }
+    }
+
+    const out = new Uint8ClampedArray(sourceImageData.data);
+    for (let i = 0; i < alpha.length; i++) out[(i << 2) + 3] = alpha[i];
+
+    processedImageData = new ImageData(out, w, h);
+    render();
+  }
+
+  function render() {
+    if (!sourceImageData) return;
+    const showOriginal = compare.checked || !processedImageData;
+    ctx.putImageData(showOriginal ? sourceImageData : processedImageData, 0, 0);
+    badge.textContent = showOriginal ? "Original" : "Result";
+  }
+
+  fileInput.addEventListener("change", () => {
+    const file = fileInput.files && fileInput.files[0];
+    if (file) handleFile(file);
+  });
+
+  ["dragenter", "dragover"].forEach((type) => {
+    drop.addEventListener(type, (e) => {
+      e.preventDefault();
+      drop.classList.add("drag");
+    });
+  });
+  ["dragleave", "dragend"].forEach((type) => {
+    drop.addEventListener(type, () => drop.classList.remove("drag"));
+  });
+  drop.addEventListener("drop", (e) => {
+    e.preventDefault();
+    drop.classList.remove("drag");
+    const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (file) handleFile(file);
+  });
+
+  window.addEventListener("dragover", (e) => e.preventDefault());
+  window.addEventListener("drop", (e) => e.preventDefault());
+
+  window.addEventListener("paste", (e) => {
+    const items = e.clipboardData && e.clipboardData.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.type && item.type.startsWith("image/")) {
+        const file = item.getAsFile();
+        if (file) { e.preventDefault(); handleFile(file); }
+        break;
+      }
+    }
+  });
+
+  let timer = null;
+  function scheduleProcess() {
+    clearTimeout(timer);
+    timer = setTimeout(process, 60);
+  }
+
+  tolInput.addEventListener("input", () => {
+    tolVal.textContent = tolInput.value;
+    scheduleProcess();
+  });
+  softInput.addEventListener("input", () => {
+    softVal.textContent = softInput.value;
+    scheduleProcess();
+  });
+  tolInput.addEventListener("change", process);
+  softInput.addEventListener("change", process);
+
+  compare.addEventListener("change", render);
+
+  dlBtn.addEventListener("click", () => {
+    if (!processedImageData) return;
+    const tmp = document.createElement("canvas");
+    tmp.width = processedImageData.width;
+    tmp.height = processedImageData.height;
+    tmp.getContext("2d").putImageData(processedImageData, 0, 0);
+
+    tmp.toBlob((blob) => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${fileName}-no-background.png`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }, "image/png");
+  });
+
+  resetBtn.addEventListener("click", () => {
+    fileInput.value = "";
+    fileInput.click();
+  });
+})();
 </script>
+
 </body>
- </html>
+</html>
