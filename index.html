@@ -1,10 +1,9 @@
-
 <!DOCTYPE html>
-<html lang="ur">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Free Background Remover - بیک گراؤنڈ ہٹائیں</title>
+<title>Free Background Remover</title>
 <meta name="description" content="Remove image background free, right in your browser. Your images never leave your device.">
 <style>
   * { box-sizing: border-box; }
@@ -34,14 +33,14 @@
 </head>
 <body>
 <header>
-  <h1>🖼️ مفت بیک گراؤنڈ ریموور</h1>
-  <p class="sub">تصویر منتخب کریں، بیک گراؤنڈ خود بخود ہٹ جائے گا۔ آپ کی تصویر آپ کے آلے سے باہر نہیں جاتی۔</p>
+  <h1>🖼️ Free Background Remover</h1>
+  <p class="sub">Choose a picture and the background is removed automatically. Your image never leaves your device.</p>
 </header>
 
 <main>
   <div class="card">
     <label class="drop" id="drop">
-      <div>📁 یہاں تصویر ڈراپ کریں یا کلک کر کے منتخب کریں</div>
+      <div>📁 Drop an image here or click to choose one</div>
       <input type="file" id="file" accept="image/*">
     </label>
 
@@ -54,8 +53,8 @@
     </div>
 
     <div class="row">
-      <button class="btn" id="removeBtn" disabled>بیک گراؤنڈ ہٹائیں</button>
-      <button class="btn secondary" id="downloadBtn" disabled>ڈاؤن لوڈ کریں (PNG)</button>
+      <button class="btn" id="removeBtn" disabled>Remove Background</button>
+      <button class="btn secondary" id="downloadBtn" disabled>Download (PNG)</button>
     </div>
   </div>
 </main>
@@ -65,15 +64,15 @@
 </footer>
 
 <script type="module">
-import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.0/dist/transformers.min.js';
-
-env.allowLocalModels = false;
+import { removeBackground } from 'https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.5.5/dist/index.mjs';
 
 const $ = id => document.getElementById(id);
-let segmenter = null;
 let currentFile = null;
 let origUrl = null;
 let resultBlob = null;
+let busy = false;
+
+const MAX_SIDE = 1200; // large photos can freeze phones, so shrink first
 
 $('year').textContent = new Date().getFullYear();
 
@@ -83,24 +82,28 @@ function setProgress(percent) {
   if (percent != null) $('bar').style.width = percent + '%';
 }
 
-async function loadModel() {
-  if (segmenter) return segmenter;
-  setStatus('ماڈل ڈاؤن لوڈ ہو رہا ہے (پہلی بار کچھ وقت لگ سکتا ہے)...');
-  setProgress(0);
-  segmenter = await pipeline('background-removal', 'Xenova/modnet', {
-    progress_callback: info => {
-      if (info.status === 'progress' && info.total) {
-        setProgress(Math.round(info.loaded / info.total * 100));
-      }
-    }
+// Shrink the image to MAX_SIDE and return a PNG blob
+function shrinkImage(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, MAX_SIDE / Math.max(img.width, img.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      canvas.toBlob(b => b ? resolve(b) : reject(new Error('Could not read this image.')), 'image/png');
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Could not open this image.')); };
+    img.src = url;
   });
-  setProgress(null);
-  return segmenter;
 }
 
 function loadFile(file) {
   if (!file || !file.type.startsWith('image/')) {
-    setStatus('براہ کرم صرف تصویر منتخب کریں۔');
+    setStatus('Please choose an image file only.');
     return;
   }
   currentFile = file;
@@ -111,7 +114,7 @@ function loadFile(file) {
   resultBlob = null;
   $('removeBtn').disabled = false;
   $('downloadBtn').disabled = true;
-  setStatus('اب "بیک گراؤنڈ ہٹائیں" دبائیں۔');
+  setStatus('Now press "Remove Background".');
 }
 
 // File input and drag-and-drop
@@ -125,30 +128,31 @@ drop.addEventListener('drop', e => loadFile(e.dataTransfer.files[0]));
 
 // Remove background
 $('removeBtn').addEventListener('click', async () => {
-  if (!currentFile) return;
+  if (!currentFile || busy) return;
+  busy = true;
   $('removeBtn').disabled = true;
   try {
-    const seg = await loadModel();
-    setStatus('بیک گراؤنڈ ہٹایا جا رہا ہے...');
+    setStatus('Preparing image...');
+    setProgress(0);
+    const small = await shrinkImage(currentFile);
 
-    const output = await seg(origUrl);
-
-    let blob;
-    if (typeof output.toBlob === 'function') {
-      blob = await output.toBlob();
-    } else {
-      blob = await new Promise(resolve => output.toCanvas().toBlob(resolve, 'image/png'));
-    }
+    setStatus('Removing background (first time downloads the AI model, please wait)...');
+    const blob = await removeBackground(small, {
+      progress: (key, current, total) => {
+        if (total) setProgress(Math.round(current / total * 100));
+      }
+    });
 
     resultBlob = blob;
     $('result').src = URL.createObjectURL(blob);
     $('downloadBtn').disabled = false;
-    setStatus('تیار ہے ✅');
+    setStatus('Done ✅');
   } catch (err) {
     console.error(err);
-    setStatus('کچھ مسئلہ ہوا: ' + err.message + ' — صفحہ ریفریش کر کے دوبارہ کوشش کریں۔');
+    setStatus('Something went wrong: ' + (err && err.message ? err.message : err));
   } finally {
     setProgress(null);
+    busy = false;
     $('removeBtn').disabled = false;
   }
 });
@@ -163,4 +167,4 @@ $('downloadBtn').addEventListener('click', () => {
 });
 </script>
 </body>
-</html>
+ </html>
