@@ -1,1 +1,166 @@
 
+<!DOCTYPE html>
+<html lang="ur">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Free Background Remover - بیک گراؤنڈ ہٹائیں</title>
+<meta name="description" content="Remove image background free, right in your browser. Your images never leave your device.">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, sans-serif; background: #f4f6fb; color: #1f2937; }
+  header { text-align: center; padding: 24px 16px 8px; }
+  h1 { margin: 0; font-size: 1.6rem; }
+  .sub { margin: 6px 0 0; color: #6b7280; }
+  main { max-width: 900px; margin: 0 auto; padding: 16px; }
+  .card { background: #fff; border-radius: 16px; padding: 20px; box-shadow: 0 4px 18px rgba(0,0,0,.06); }
+  .drop { display: block; border: 2px dashed #93c5fd; border-radius: 14px; padding: 32px 16px; text-align: center; cursor: pointer; }
+  .drop.over { background: #eff6ff; }
+  #file { display: none; }
+  .btn { background: #2563eb; color: #fff; border: 0; padding: 12px 20px; border-radius: 10px; font-size: 1rem; cursor: pointer; }
+  .btn:disabled { background: #9ca3af; cursor: not-allowed; }
+  .btn.secondary { background: #10b981; }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-top: 16px; }
+  .previews { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
+  @media (max-width: 600px) { .previews { grid-template-columns: 1fr; } }
+  .box { background: repeating-conic-gradient(#e5e7eb 0% 25%, #fff 0% 50%) 50% / 20px 20px; border-radius: 12px; min-height: 180px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  .box img { max-width: 100%; max-height: 420px; display: block; }
+  #status { text-align: center; margin-top: 14px; color: #4b5563; min-height: 1.2em; }
+  .progress { height: 8px; background: #e5e7eb; border-radius: 99px; overflow: hidden; margin-top: 8px; display: none; }
+  .progress > div { height: 100%; width: 0; background: #2563eb; transition: width .2s; }
+  footer { text-align: center; color: #9ca3af; font-size: .85rem; padding: 24px; }
+  footer a { color: inherit; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🖼️ مفت بیک گراؤنڈ ریموور</h1>
+  <p class="sub">تصویر منتخب کریں، بیک گراؤنڈ خود بخود ہٹ جائے گا۔ آپ کی تصویر آپ کے آلے سے باہر نہیں جاتی۔</p>
+</header>
+
+<main>
+  <div class="card">
+    <label class="drop" id="drop">
+      <div>📁 یہاں تصویر ڈراپ کریں یا کلک کر کے منتخب کریں</div>
+      <input type="file" id="file" accept="image/*">
+    </label>
+
+    <div class="progress" id="progress"><div id="bar"></div></div>
+    <div id="status"></div>
+
+    <div class="previews">
+      <div><div class="box"><img id="orig" alt=""></div></div>
+      <div><div class="box"><img id="result" alt=""></div></div>
+    </div>
+
+    <div class="row">
+      <button class="btn" id="removeBtn" disabled>بیک گراؤنڈ ہٹائیں</button>
+      <button class="btn secondary" id="downloadBtn" disabled>ڈاؤن لوڈ کریں (PNG)</button>
+    </div>
+  </div>
+</main>
+
+<footer>
+  © <span id="year"></span> · <a href="#">Privacy Policy</a> · <a href="#">Contact</a>
+</footer>
+
+<script type="module">
+import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.0/dist/transformers.min.js';
+
+env.allowLocalModels = false;
+
+const $ = id => document.getElementById(id);
+let segmenter = null;
+let currentFile = null;
+let origUrl = null;
+let resultBlob = null;
+
+$('year').textContent = new Date().getFullYear();
+
+function setStatus(text) { $('status').textContent = text; }
+function setProgress(percent) {
+  $('progress').style.display = percent == null ? 'none' : 'block';
+  if (percent != null) $('bar').style.width = percent + '%';
+}
+
+async function loadModel() {
+  if (segmenter) return segmenter;
+  setStatus('ماڈل ڈاؤن لوڈ ہو رہا ہے (پہلی بار کچھ وقت لگ سکتا ہے)...');
+  setProgress(0);
+  segmenter = await pipeline('background-removal', 'Xenova/modnet', {
+    progress_callback: info => {
+      if (info.status === 'progress' && info.total) {
+        setProgress(Math.round(info.loaded / info.total * 100));
+      }
+    }
+  });
+  setProgress(null);
+  return segmenter;
+}
+
+function loadFile(file) {
+  if (!file || !file.type.startsWith('image/')) {
+    setStatus('براہ کرم صرف تصویر منتخب کریں۔');
+    return;
+  }
+  currentFile = file;
+  if (origUrl) URL.revokeObjectURL(origUrl);
+  origUrl = URL.createObjectURL(file);
+  $('orig').src = origUrl;
+  $('result').removeAttribute('src');
+  resultBlob = null;
+  $('removeBtn').disabled = false;
+  $('downloadBtn').disabled = true;
+  setStatus('اب "بیک گراؤنڈ ہٹائیں" دبائیں۔');
+}
+
+// File input and drag-and-drop
+const drop = $('drop');
+$('file').addEventListener('change', e => loadFile(e.target.files[0]));
+['dragenter', 'dragover'].forEach(ev =>
+  drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+['dragleave', 'drop'].forEach(ev =>
+  drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', e => loadFile(e.dataTransfer.files[0]));
+
+// Remove background
+$('removeBtn').addEventListener('click', async () => {
+  if (!currentFile) return;
+  $('removeBtn').disabled = true;
+  try {
+    const seg = await loadModel();
+    setStatus('بیک گراؤنڈ ہٹایا جا رہا ہے...');
+
+    const output = await seg(origUrl);
+
+    let blob;
+    if (typeof output.toBlob === 'function') {
+      blob = await output.toBlob();
+    } else {
+      blob = await new Promise(resolve => output.toCanvas().toBlob(resolve, 'image/png'));
+    }
+
+    resultBlob = blob;
+    $('result').src = URL.createObjectURL(blob);
+    $('downloadBtn').disabled = false;
+    setStatus('تیار ہے ✅');
+  } catch (err) {
+    console.error(err);
+    setStatus('کچھ مسئلہ ہوا: ' + err.message + ' — صفحہ ریفریش کر کے دوبارہ کوشش کریں۔');
+  } finally {
+    setProgress(null);
+    $('removeBtn').disabled = false;
+  }
+});
+
+// Download as PNG (transparent background)
+$('downloadBtn').addEventListener('click', () => {
+  if (!resultBlob) return;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(resultBlob);
+  a.download = 'no-background.png';
+  a.click();
+});
+</script>
+</body>
+</html>
